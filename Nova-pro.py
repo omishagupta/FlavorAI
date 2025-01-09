@@ -125,53 +125,111 @@ def process_input(image, additional_text):
     recipe = generate_recipes(combined_input)
     return ingredients, recipe
 
-# Create Gradio interface with both outputs
-iface = gr.Interface(
-    fn=process_input,
-    inputs=[
-        gr.Image(type="numpy", label="Upload an Image"),
-        gr.Textbox(
-            label="Additional Ingredients or Preferences",
-            placeholder="Enter any additional ingredients or preferences (optional)",
-            lines=2
-        )
-    ],
-    outputs=[
-        gr.Markdown(label="Detected Ingredients"),
-        gr.Markdown(label="Generated Recipe")
-    ],
-    title="FlavorAI",
-    description="Upload an image of food and add any additional preferences to detect ingredients and generate recipes."
-)
+def capture_image(img):
+    try:
+        if img is None:
+            raise ValueError("No image captured!")
+        return img, img
+    except Exception as e:
+        print(f"Capture error: {str(e)}")
+        return None, None
 
-# Alternative version using Blocks for better layout control:
+def process_captured_image(captured_img, text_input):
+    if captured_img is None:
+        return "### Error\nNo image captured", "### Error\nPlease capture an image first"
+    return process_input(captured_img, text_input)
+
 with gr.Blocks(title="FlavorAI", theme=gr.themes.Soft()) as iface:
     gr.Markdown("# 🍳 FlavorAI")
-    gr.Markdown("Upload an image of food and add any additional preferences to detect ingredients and generate recipes.")
+    gr.Markdown("Upload an image, capture from webcam, or provide ingredients to generate recipes.")
+    
+    # State variable to store captured image
+    captured_image = gr.State(value=None)
     
     with gr.Row():
         with gr.Column(scale=1):
-            image_input = gr.Image(type="numpy", label="Upload an Image")
+            # Tabs for different input methods
+            with gr.Tabs():
+                with gr.TabItem("Upload Image"):
+                    upload_input = gr.Image(
+                        type="numpy",
+                        label="Upload an Image",
+                        sources=["upload"],
+                        height=350
+                    )
+                    
+                    upload_analyze_btn = gr.Button("Analyze Uploaded Image", variant="primary")
+                
+                with gr.TabItem("Webcam"):
+                    webcam_input = gr.Image(
+                        type="numpy",
+                        label="Capture from Webcam",
+                        sources=["webcam"],
+                        streaming=False,  # Changed to False
+                        mirror_webcam=True,
+                        height=350
+                    )
+                    
+                    preview_image = gr.Image(
+                        type="numpy",
+                        label="Captured Image",
+                        interactive=False,
+                        height=200
+                    )
+                    
+                    with gr.Row():
+                        webcam_clear = gr.Button("Clear", variant="secondary", size="sm")
+                        webcam_capture = gr.Button("Capture", variant="secondary", size="sm")
+                    
+                    webcam_analyze_btn = gr.Button("Analyze Captured Image", variant="primary")
+            
+            # Text input
             text_input = gr.Textbox(
                 label="Additional Ingredients or Preferences",
                 placeholder="Enter any additional ingredients or preferences (optional)",
                 lines=2
             )
-            analyze_btn = gr.Button("Analyze and Generate Recipe", variant="primary")
         
         with gr.Column(scale=1):
-            ingredients_output = gr.Markdown(
-                label="Detected Ingredients",
-            )
-            recipe_output = gr.Markdown(
-                label="Generated Recipe",
-            )
+            ingredients_output = gr.Markdown(label="Detected Ingredients")
+            recipe_output = gr.Markdown(label="Generated Recipe")
     
-    analyze_btn.click(
+    # Webcam capture functionality
+    def capture_image(img):
+        if img is None:
+            gr.Warning("No image captured!")
+            return None, None
+        return img, img
+
+    webcam_capture.click(
+        fn=capture_image,
+        inputs=[webcam_input],
+        outputs=[preview_image, captured_image]
+    )
+    
+    # Clear webcam functionality
+    webcam_clear.click(
+        fn=lambda: (None, None, None),
+        outputs=[webcam_input, preview_image, captured_image]
+    )
+    
+    # Analysis functionality for uploaded images
+    upload_analyze_btn.click(
         fn=process_input,
-        inputs=[image_input, text_input],
-        outputs=[ingredients_output, recipe_output]
+        inputs=[upload_input, text_input],
+        outputs=[ingredients_output, recipe_output],
+        api_name="analyze_upload",
+        show_progress=True
+    )
+    
+    # Analysis functionality for captured images
+    webcam_analyze_btn.click(
+        fn=process_captured_image,
+        inputs=[captured_image, text_input],
+        outputs=[ingredients_output, recipe_output],
+        api_name="analyze_capture",
+        show_progress=True
     )
 
-# Launch the Gradio app
-iface.launch()
+if __name__ == "__main__":
+    iface.launch()
