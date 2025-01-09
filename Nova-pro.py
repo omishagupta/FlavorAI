@@ -34,7 +34,7 @@ def extract_ingredients(image):
                     }
                 },
                 {
-                    "text": "List only the ingredients visible in this image with the count in bullet points."
+                    "text": "List only the ingredients visible in this image with the count in bullet points. Also provide heading identified ingredients in markdown heading"
                 }
             ],
         }
@@ -131,18 +131,47 @@ iface = gr.Interface(
     inputs=[
         gr.Image(type="numpy", label="Upload an Image"),
         gr.Textbox(
-        label="Additional Ingredients or Preferences",
-        placeholder="Enter any additional ingredients or preferences (optional)",
-        lines=2
+            label="Additional Ingredients or Preferences",
+            placeholder="Enter any additional ingredients or preferences (optional)",
+            lines=2
         )
     ],
     outputs=[
-        gr.Textbox(label="Detected Ingredients"),
-        gr.Textbox(label="Generated Recipe")
+        gr.Markdown(label="Detected Ingredients"),
+        gr.Markdown(label="Generated Recipe")
     ],
     title="FlavorAI",
-    description="Upload an image of food to detect ingredients and generate recipes."
+    description="Upload an image of food and add any additional preferences to detect ingredients and generate recipes."
 )
+
+# Alternative version using Blocks for better layout control:
+with gr.Blocks(title="FlavorAI", theme=gr.themes.Soft()) as iface:
+    gr.Markdown("# 🍳 FlavorAI")
+    gr.Markdown("Upload an image of food and add any additional preferences to detect ingredients and generate recipes.")
+    
+    with gr.Row():
+        with gr.Column(scale=1):
+            image_input = gr.Image(type="numpy", label="Upload an Image")
+            text_input = gr.Textbox(
+                label="Additional Ingredients or Preferences",
+                placeholder="Enter any additional ingredients or preferences (optional)",
+                lines=2
+            )
+            analyze_btn = gr.Button("Analyze and Generate Recipe", variant="primary")
+        
+        with gr.Column(scale=1):
+            ingredients_output = gr.Markdown(
+                label="Detected Ingredients",
+            )
+            recipe_output = gr.Markdown(
+                label="Generated Recipe",
+            )
+    
+    analyze_btn.click(
+        fn=process_input,
+        inputs=[image_input, text_input],
+        outputs=[ingredients_output, recipe_output]
+    )
 
 # Launch the Gradio app
 iface.launch()
