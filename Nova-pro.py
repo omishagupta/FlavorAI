@@ -100,7 +100,7 @@ def extract_ingredients(media):
 
         # Call the Bedrock model
         response = bedrock_client.invoke_model(
-            modelId='us.amazon.nova-lite-v1:0',
+            modelId='amazon.nova-pro-v1:0',
             body=json.dumps(input_prompt),
             contentType='application/json',
             accept='application/json'
@@ -203,6 +203,7 @@ def process_media_input(media, text_input=None, progress=gr.Progress()):
         progress(0.1, desc="Starting media processing...")
         
         if media is None:
+            gr.Warning("Uh-oh! No media detected!")
             return "### Error\nNo media provided", ""
 
         # Check if media is a file path (string from video upload)
@@ -230,21 +231,15 @@ def process_media_input(media, text_input=None, progress=gr.Progress()):
         if not ingredients.startswith("### Error"):
             combined_input = f"{ingredients}\n{text_input}" if text_input else ingredients
             recipe = generate_recipes(combined_input)
-            progress(1.0, desc="Complete!")
+            progress(0.9, desc="Complete!")
             return ingredients, recipe
         else:
-            progress(1.0, desc="Error occurred")
+            progress(0.9, desc="Error occurred")
             return ingredients, "### Error\nCould not generate recipe due to ingredient detection failure"
 
     except Exception as e:
         progress(1.0, desc="Error occurred")
         return f"### Error\nProcessing failed: {str(e)}", "### Error\nUnable to generate recipe"
-
-# Update the Gradio interface
-def process_captured_image(captured_img, text_input):
-    if captured_img is None:
-        return "### Error\nNo image captured", "### Error\nPlease capture an image first"
-    return process_input(captured_img, text_input)
 
 def process_video(video, text_input):
     if video is None:
@@ -285,26 +280,6 @@ with gr.Blocks(title="FlavorAI", theme=gr.themes.Soft()) as iface:
                         height=350
                     )
                     video_upload_analyze_btn = gr.Button("Analyze Uploaded Video", variant="primary")
-
-                        # with gr.TabItem("Record Video"):
-                        #     video_recorder = gr.Video(
-                        #         label="Record from Webcam",
-                        #         sources=["webcam"],
-                        #         height=350,
-                        #         format="mp4"
-                        #     )
-                            
-                        #     preview_video = gr.Video(
-                        #         label="Recorded Video",
-                        #         interactive=False,
-                        #         height=200
-                        #     )
-                            
-                            # with gr.Row():
-                            #     video_clear = gr.Button("Clear", variant="secondary", size="sm")
-                            #     video_record = gr.Button("Start/Stop Recording", variant="secondary", size="sm")
-                            
-                            # video_analyze_btn = gr.Button("Analyze Recorded Video", variant="primary")
             
             # Text input
             text_input = gr.Textbox(
@@ -331,45 +306,14 @@ with gr.Blocks(title="FlavorAI", theme=gr.themes.Soft()) as iface:
             return None, None
         return video, video
 
-    # Clear functionalities
-    # webcam_capture.click(
-    #     fn=capture_image,
-    #     inputs=[webcam_input],
-    #     outputs=[preview_image, webcam_input]
-    # )
-
-    # webcam_clear.click(
-    #     fn=lambda: (None, None, None),
-    #     outputs=[webcam_input, preview_image]
-    # )
-
-    # video_record.click(
-    #     fn=handle_video,
-    #     inputs=[video_recorder],
-    #     outputs=[preview_video, video_recorder]
-    # )
-
-    # video_clear.click(
-    #     fn=lambda: (None, None, None),
-    #     outputs=[video_recorder, preview_video]
-    # )
-
     # Analysis functionalities
     upload_analyze_btn.click(
-        fn=process_input,
+        fn=process_media_input,
         inputs=[upload_input, text_input],
         outputs=[ingredients_output, recipe_output],
         api_name="analyze_upload",
         show_progress=True
     )
-
-    # webcam_analyze_btn.click(
-    #     fn=process_captured_image,
-    #     inputs=[preview_image, text_input],
-    #     outputs=[ingredients_output, recipe_output],
-    #     api_name="analyze_capture",
-    #     show_progress=True
-    # )
 
     # New video analysis functionalities
     video_upload_analyze_btn.click(
@@ -379,14 +323,6 @@ with gr.Blocks(title="FlavorAI", theme=gr.themes.Soft()) as iface:
         api_name="analyze_uploaded_video",
         show_progress=True
     )
-
-    # video_analyze_btn.click(
-    #     fn=process_media_input,
-    #     inputs=[preview_video, text_input],
-    #     outputs=[ingredients_output, recipe_output],
-    #     api_name="analyze_recorded_video",
-    #     show_progress=True
-    # )
 
 if __name__ == "__main__":
     iface.launch()
