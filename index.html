@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlavorAI</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8f9fa;
+    }
+    h1 {
+      font-size: 2rem;
+    }
+    p {
+      font-size: 1rem;
+    }
+    #results {
+      word-wrap: break-word;
+      text-align: left;
+    }
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5rem;
+      }
+      p {
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container text-center mt-4">
+    <h1>🍳 FlavorAI</h1>
+    <p>Upload an image or video to detect ingredients and generate recipes.</p>
+    <input type="file" class="form-control my-3" accept="image/*,video/*" />
+    <textarea class="form-control my-3" rows="4" placeholder="Enter preferences"></textarea>
+    <button class="btn btn-primary btn-block py-2">Upload & Analyze</button>
+    <div id="results" class="mt-4 p-3 bg-light rounded"></div>
+  </div>
+</body>
+</html>
