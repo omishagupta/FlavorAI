@@ -293,10 +293,10 @@ with gr.Blocks(css=custom_css, title="FlavorAI", theme=gr.themes.Soft(primary_hu
     gr.Markdown("""
         <div style='display: flex; justify-content: space-between; align-items: center; padding: 10px;'>
             <div style='flex: 1;'>
-                <img src='file/powered-by-aws.png' style='width: 90px; height: 30px; object-fit: contain;'>
+                <img src='assets/powered-by-aws.png' style='width: 90px; height: 30px; object-fit: contain;'>
             </div>
             <center><div style='flex: 2; text-align: center;'>
-                <img src='file/flavorAI-hdlogo.png' style='width: 300px; height: 100px; object-fit: contain;'>
+                <img src='assets/flavorAI-hdlogo.png' style='width: 300px; height: 100px; object-fit: contain;'>
             </div></center>
             <div style='flex: 1;'></div>
         </div>
