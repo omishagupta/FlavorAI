@@ -6,6 +6,8 @@ WORKDIR /usr/src/app
 
 # Copy the current directory contents into the container at /usr/src/app
 COPY . .
+COPY ./public /usr/src/app/public
+RUN chmod -R 755 /usr/src/app/public/
 
 # Install required packages
 RUN pip install --no-cache-dir -r requirements.txt
