@@ -3,75 +3,49 @@ import gradio as gr
 import boto3
 import json
 import base64
-import re
 import io
 import numpy as np
-import logging
 
 # Initialize Boto3 client for Bedrock
-bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')  # Change region if needed
-# boto3.set_stream_logger('botocore', level=logging.DEBUG)
+bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
 
 def extract_ingredients(media):
-
     try:
-        # Check if media is a video file path (string)
-        if isinstance(media, str):
+        if isinstance(media, str):  # Handle video input
             with open(media, "rb") as video_file:
-                    binary_data = video_file.read()
-                    base_64_encoded_data = base64.b64encode(binary_data)
-                    base64_string = base_64_encoded_data.decode("utf-8")
-                # Define your system prompt(s).
-            system_list = [
-                {
-                    "text": f"""You are an expert media analyst and a professional in identifying food ingredients from visual content."""
-                }
-            ]
-                # Define a "user" message including both the image and a text prompt.
+                binary_data = video_file.read()
+                base64_string = base64.b64encode(binary_data).decode("utf-8")
             input_prompt = {
                 "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "video": {
-                                "format": "mp4",
-                                "source": {"bytes": base64_string},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "video": {
+                                    "format": "mp4",
+                                    "source": {"bytes": base64_string},
+                                }
+                            },
+                            {
+                                "text": """You are an expert media analyst and a professional in identifying food ingredients from visual content.
+                                    List only the exact ingredients visible in the video. Be specific in naming the ingredients (e.g., "red pepper" instead of "bell pepper").
+                                    Exclude non-edible items. Provide the ingredients and their count as bullet points."""
                             }
-                        },
-                        {
-                            "text": f"""You are an expert media analyst and a professional in identifying food ingredients from visual content. When analyzing the provided video, adhere to the following instructions:
-                                        List only the exact ingredients visible in the video. Be specific in naming the ingredients (e.g., "red pepper" instead of "bell pepper"). Avoid vague terms or generalizations.
-                                        Exclude non-edible items. Focus only on the edible ingredients. Do not list non-edible ingredients.
-                                        Provide the ingredients and their count as bullet points. Each point should include:
-                                        The name of the ingredient.
-                                        The quantity, if it is visually identifiable.
-                                        Do not include any commentary or observations outside of the requested format. Only list edible ingredients that can be clearly identified in the video."""
-                        },
-                    ],
+                        ]
+                    }
+                ],
+                "inferenceConfig": {
+                    "max_new_tokens": 2048,
+                    "top_p": 0.95,
+                    "top_k": 250,
+                    "temperature": 1
                 }
-            ] }
-            # Configure the inference parameters.
-            inf_params = {"max_new_tokens": 300, "top_p": 0.1, "top_k": 20, "temperature": 0.3}
-
-            native_request = {
-                "schemaVersion": "messages-v1",
-                "messages": input_prompt,
-                "system": system_list,
-                "inferenceConfig": inf_params,
             }
-            
-        # Handle image input (numpy array)
-        else:
-            print("Processing image...")
-            # Convert numpy array to PIL Image
+        else:  # Handle image input
             pil_image = Image.fromarray(media)
-
-            # Encode the image to base64
             buffered = io.BytesIO()
             pil_image.save(buffered, format="JPEG")
             image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
             input_prompt = {
                 "messages": [
                     {
@@ -84,26 +58,22 @@ def extract_ingredients(media):
                                 }
                             },
                             {
-                                "text": f"""You are an expert media analyst and a professional in identifying food ingredients from visual content. When analyzing the provided video, adhere to the following instructions:
-                                        List only the exact ingredients visible in the video. Be specific in naming the ingredients (e.g., "red pepper" instead of "bell pepper"). Avoid vague terms or generalizations.
-                                        Exclude non-edible items. Focus only on the edible ingredients. Do not list non-edible ingredients
-                                        Provide the ingredients and their count as bullet points. Each point should include:
-                                        The name of the ingredient.
-                                        The quantity, if it is visually identifiable.
-                                        Do not include any commentary or observations outside of the requested format."""
+                                "text": """You are an expert media analyst and a professional in identifying food ingredients from visual content.
+                                    List only the exact ingredients visible in the image. Be specific in naming the ingredients (e.g., "red pepper" instead of "bell pepper").
+                                    Exclude non-edible items. Provide the ingredients and their count as bullet points."""
                             }
                         ]
                     }
                 ],
                 "inferenceConfig": {
                     "max_new_tokens": 2048,
-                    "top_p": 0.9,
-                    "top_k": 20,
+                    "top_p": 0.95,
+                    "top_k": 250,
                     "temperature": 0.7
                 }
             }
 
-        # Call the Bedrock model
+        # Call Bedrock model
         response = bedrock_client.invoke_model(
             modelId='amazon.nova-pro-v1:0',
             body=json.dumps(input_prompt),
@@ -112,26 +82,16 @@ def extract_ingredients(media):
         )
 
         model_response = json.loads(response["body"].read())
+        try:
+            ingredients = model_response["output"]["message"]["content"][0]["text"]
+        except (KeyError, IndexError) as e:
+            return f"### Error\nUnexpected model response format: {str(e)}"
         
-        # Pretty print the response JSON for debugging
-        print(json.dumps(model_response, indent=2))
-        
-        # Extract ingredients from response
-        ingredients = model_response["output"]["message"]["content"][0]["text"]
-        
-        # Add context about the media type
         media_type = "video" if isinstance(media, str) else "image"
-        ingredients = f"### Ingredients (detected from {media_type})\n{ingredients}"
-        
-        print("\n[Response Content Text]")
-        print(ingredients)
-        
-        return ingredients
+        return f"### Ingredients (detected from {media_type})\n{ingredients}"
 
     except Exception as e:
-        error_msg = f"Error processing {'video' if isinstance(media, str) else 'image'}: {str(e)}"
-        print(error_msg)
-        return f"### Error\n{error_msg}"
+        return f"### Error\nError processing media: {str(e)}"
 
 def generate_recipes(combined_input):
     try:
@@ -141,13 +101,13 @@ def generate_recipes(combined_input):
                     "role": "user",
                     "content": [
                         {
-                            "text": f"""Generate a recipe based on the following, please note that note that its not required to use all the ingredients:
+                            "text": f"""Generate a recipe based on the following ingredients:
                             Available ingredients: {combined_input}
                             
                             Please provide:
-                            1. A simple recipe title (keep it bold heading)
-                            2. Estimated cooking time and Serving size
-                            3. Nutritional value (include calories, protein, fat, carbs)
+                            1. A simple recipe title (bold heading)
+                            2. Estimated cooking time and serving size
+                            3. Nutritional value (calories, protein, fat, carbs)
                             4. List of ingredients with measurements
                             5. Step-by-step cooking instructions"""
                         }
@@ -170,102 +130,52 @@ def generate_recipes(combined_input):
         )
 
         response_body = json.loads(response['body'].read())
-        print(json.dumps(response_body, indent=2))
-        # Print the text content for easy readability.
-        recipe = response_body["output"]["message"]["content"][0]["text"]
-        print("\n[Response Content Text]")
-        return recipe
-    
-        if 'error' in response_body:
-            return f"Error: {response_body['error']}"
-            
-        if 'output' in response_body:
-            return response_body['output']
+        try:
+            recipe = response_body["output"]["message"]["content"][0]["text"]
+        except (KeyError, IndexError) as e:
+            return f"### Error\nUnexpected model response format: {str(e)}"
         
-        return "No recipe generated"
+        return recipe
 
     except Exception as e:
-        return f"Error generating recipe: {str(e)}"
+        return f"### Error\nError generating recipe: {str(e)}"
 
-def process_input(image, additional_text):
-    ingredients = extract_ingredients(image)
-    # Combine detected ingredients with any additional ingredients/preferences
-    combined_input = f"{ingredients}\nAdditional preferences: {additional_text}" if additional_text else ingredients
-    recipe = generate_recipes(combined_input)
-    return ingredients, recipe
-
-def capture_image(img):
-    if img is None:
-        gr.Warning("No image captured!")
-        return None, None
-    return img, img
-
-def process_media_input(media, text_input=None, progress=gr.Progress()):
-    """
-    Process either image or video input with progress updates
-    """
+def process_media_input(media, text_input=None, ingredients_state=None, progress=gr.Progress()):
     try:
         progress(0.1, desc="Starting media processing...")
-        
-        if media is None:
-            gr.Warning("Uh-oh! No media detected!")
-            return "### Error\nNo media provided", ""
 
-        # Check if media is a file path (string from video upload)
-        if isinstance(media, str):
-            is_video = True
-        # Check if media is numpy array (from image upload)
-        elif isinstance(media, np.ndarray):
-            is_video = len(media.shape) == 4
+        # Validate media input or use cached state
+        if media is None and not ingredients_state:
+            return "### Error\nNo media or cached data provided", ""
+
+        if not isinstance(media, (str, np.ndarray)) and media is not None:
+            return "### Error\nUnsupported media format", ""
+
+        # Use cached ingredients if available
+        if ingredients_state:
+            ingredients = ingredients_state
+            progress(0.3, desc="Using cached ingredients...")
         else:
-            return "### Error\nInvalid media format", ""
-
-        progress(0.3, desc="Analyzing media...")
+            ingredients = extract_ingredients(media)
+            if ingredients.startswith("### Error"):
+                return ingredients, ""
         
-        # Process based on input type
-        if is_video:
-            progress(0.4, desc="Processing video...")
-            ingredients = extract_ingredients(media)
-        else:
-            progress(0.4, desc="Processing image...")
-            ingredients = extract_ingredients(media)
-
         progress(0.6, desc="Generating recipe...")
+        combined_input = f"{ingredients}\n{text_input}" if text_input else ingredients
+        recipe = generate_recipes(combined_input)
         
-        # Generate recipe if ingredients were successfully extracted
-        if not ingredients.startswith("### Error"):
-            combined_input = f"{ingredients}\n{text_input}" if text_input else ingredients
-            recipe = generate_recipes(combined_input)
-            progress(0.9, desc="Complete!")
-            return ingredients, recipe
-        else:
-            progress(0.9, desc="Error occurred")
-            return ingredients, "### Error\nCould not generate recipe due to ingredient detection failure"
-
-    except Exception as e:
-        progress(1.0, desc="Error occurred")
-        return f"### Error\nProcessing failed: {str(e)}", "### Error\nUnable to generate recipe"
-
-def process_video(video, text_input):
-    if video is None:
-        gr.Warning("No video provided!")
-        return "### Error\nNo video to analyze", ""
-    
-    try:
-        # Your video processing logic here
-        # You might want to extract frames or process the video in some way
-        ingredients = extract_ingredients(video)
-        recipe = generate_recipes(ingredients, text_input)
+        progress(0.9, desc="Complete!")
         return ingredients, recipe
+
     except Exception as e:
-        return f"### Error\n{str(e)}", ""
+        return f"### Error\nProcessing failed: {str(e)}", "### Error\nUnable to generate recipe"
 
 custom_css = """
 .gradio-container {
     background: linear-gradient(#135deg, #f3f4f6, #e2e8f0);
     padding: 10px;
     margin: 0;
-    max-width: 600px; /* Limit the container width */;
+    max-width: 800px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
     border-radius: 6px;
 }
@@ -289,7 +199,7 @@ custom_css = """
 """
 
 with gr.Blocks(css=custom_css, title="FlavorAI", theme=gr.themes.Soft(primary_hue="indigo", spacing_size="sm")) as iface:
-
+    ingredients_state = gr.State()
     gr.Markdown("""
         <div style='display: flex; justify-content: space-between; align-items: center; padding: 10px;'>
             <div style='flex: 1;'>
@@ -305,74 +215,38 @@ with gr.Blocks(css=custom_css, title="FlavorAI", theme=gr.themes.Soft(primary_hu
 
     with gr.Row():
         with gr.Column(scale=1):
-            # Tabs for different input methods
             with gr.Tabs():
                 with gr.TabItem("🖼️ Image"):
-                    upload_input = gr.Image(
-                        type="numpy",
-                        label="Upload an Image",
-                        sources=["upload"],
-                        height=350
-                    )
-                     # Text input
-                    text_input = gr.Textbox(
-                        label="Additional Ingredients or Preferences",
-                        placeholder="Enter any additional ingredients or preferences (optional)",
-                        lines=2
-                    )
-
-                    upload_analyze_btn = gr.Button("Analyze Uploaded Image", variant="primary")
-
-                # New Video Tab
+                    upload_input = gr.Image(type="numpy", label="Upload an Image", sources=["upload"], height=350)
+                    text_input = gr.Textbox(label="Additional Preferences (optional)", placeholder="Enter additional preferences...")
+                    analyze_btn = gr.Button("Analyze Uploaded Image")
                 with gr.TabItem("🎥 Video"):
-                    video_upload = gr.Video(
-                        label="Upload a Video",
-                        sources=["upload"],
-                        height=350
-                    )
-                    # Text input
-                    text_input = gr.Textbox(
-                        label="Additional Ingredients or Preferences",
-                        placeholder="Enter any additional ingredients or preferences (optional)",
-                        lines=2
-                    )
-                    video_upload_analyze_btn = gr.Button("Analyze Uploaded Video", variant="primary")
-        
+                    video_upload = gr.Video(label="Upload a Video", sources=["upload"], height=350)
+                    text_input = gr.Textbox(label="Additional Preferences (optional)", placeholder="Enter additional preferences...")
+                    analyze_video_btn = gr.Button("Analyze Uploaded Video")
         with gr.Column(scale=1):
             ingredients_output = gr.Markdown(label="Detected Ingredients")
             recipe_output = gr.Markdown(label="Generated Recipe")
 
-    # Existing image capture functionality
-    def capture_image(img):
-        if img is None:
-            gr.Warning("No image captured!")
-            return None, None
-        return img, img
-
-    # New video recording functionality
-    def handle_video(video):
-        if video is None:
-            gr.Warning("No video recorded!")
-            return None, None
-        return video, video
-
-    # Analysis functionalities
-    upload_analyze_btn.click(
+    analyze_btn.click(
         fn=process_media_input,
-        inputs=[upload_input, text_input],
+        inputs=[upload_input, text_input, ingredients_state],
         outputs=[ingredients_output, recipe_output],
-        api_name="analyze_upload",
         show_progress=True
     )
-
-    # New video analysis functionalities
-    video_upload_analyze_btn.click(
-        fn=process_media_input,
-        inputs=[video_upload, text_input],
-        outputs=[ingredients_output, recipe_output],
-        api_name="analyze_uploaded_video",
-        show_progress=True
+    
+    analyze_btn.click(
+        fn=lambda ingredients: ingredients,
+        inputs=[ingredients_output],
+        outputs=[ingredients_state]
     )
 
+    analyze_video_btn.click(
+        fn=process_media_input,
+        inputs=[video_upload, text_input, ingredients_state],
+        outputs=[ingredients_output, recipe_output],
+        show_progress=True
+    )
+    
 if __name__ == "__main__":
-    iface.launch(allowed_paths=["/"])
+    iface.launch()
