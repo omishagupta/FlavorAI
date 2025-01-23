@@ -293,10 +293,10 @@ with gr.Blocks(css=custom_css, title="FlavorAI", theme=gr.themes.Soft(primary_hu
     gr.Markdown("""
         <div style='display: flex; justify-content: space-between; align-items: center; padding: 10px;'>
             <div style='flex: 1;'>
-                <img src='file:\\./powered-by-aws.png' style='width: 90px; height: 30px; object-fit: contain;'>
+                <img src='https://i.imghippo.com/files/kPy5369H.png' style='width: 150px; height: 50px; object-fit: contain;'>
             </div>
             <center><div style='flex: 2; text-align: center;'>
-                <img src='file:\\./flavorAI-hdlogo.png' style='width: 300px; height: 100px; object-fit: contain;'>
+                <img src="https://i.imghippo.com/files/eUe1202ed.png" alt="" border="0" style='width: 300px; height: 100px; object-fit: contain;'>
             </div></center>
             <div style='flex: 1;'></div>
         </div>
@@ -375,4 +375,4 @@ with gr.Blocks(css=custom_css, title="FlavorAI", theme=gr.themes.Soft(primary_hu
     )
 
 if __name__ == "__main__":
-    iface.launch(("accepted_paths=./"))
+    iface.launch(allowed_paths=["/"])
